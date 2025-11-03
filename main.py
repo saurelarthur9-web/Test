@@ -25,7 +25,7 @@ def load_image_or_create_fallback(filename, size, color, is_background=False):
             return image.convert()
         else:
             return image.convert_alpha()
-    except pygame.error:
+    except (pygame.error, FileNotFoundError): # Correction ici pour attraper les deux erreurs
         print(f"Avertissement: L'image '{filename}' n'a pas été trouvée. Utilisation d'un placeholder.")
         surface = pygame.Surface(size)
         surface.fill(color)
@@ -33,7 +33,7 @@ def load_image_or_create_fallback(filename, size, color, is_background=False):
 
 # --- CHARGEMENT DES ASSETS ---
 player_size = (40, 50)
-platform_size = (100, 20) # La taille sera étirée, ce n'est qu'un fallback
+platform_size = (100, 20)
 coin_size = (30, 30)
 background_size = (screen_width, screen_height)
 
