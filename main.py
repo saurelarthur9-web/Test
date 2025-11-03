@@ -11,23 +11,26 @@ screen = pygame.display.set_mode((screen_width, screen_height))
 # Titre de la fenêtre
 pygame.display.set_caption("Jeu de Plateforme")
 
+# Horloge pour contrôler le FPS
+clock = pygame.time.Clock()
+FPS = 60
+
 # Définition du joueur
 player_width = 40
 player_height = 50
 player_x = (screen_width - player_width) / 2
 player_y = 0 # Commence en haut pour tomber sur les plateformes
 player_color = (255, 0, 0) # Rouge
-player_speed = 5
+player_speed = 4 # Vitesse réduite pour un meilleur contrôle
 # On utilise un Rect pour faciliter la détection de collision
 player_rect = pygame.Rect(player_x, player_y, player_width, player_height)
 
 # Physique du joueur
-gravity = 1
-jump_strength = -20
+gravity = 0.8 # Gravité légèrement ajustée pour le nouveau FPS
+jump_strength = -18 # Saut légèrement ajusté
 player_y_velocity = 0
 
 # Plateformes
-# Le sol est maintenant juste une autre plateforme
 platforms_data = [
     (0, screen_height - 40, screen_width, 40), # Le sol
     (200, 450, 150, 20),
@@ -40,6 +43,9 @@ platform_color = (0, 255, 0) # Vert
 # Boucle principale du jeu
 running = True
 while running:
+    # Réguler le FPS
+    clock.tick(FPS)
+
     # Gestion des événements
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -72,18 +78,15 @@ while running:
     # Gestion des collisions avec les plateformes
     is_on_ground = False
     for plat_rect in platform_rects:
-        # Est-ce que le joueur touche la plateforme ET est-il en train de tomber?
         if player_rect.colliderect(plat_rect) and player_y_velocity > 0:
-            # On vérifie que le bas du joueur est bien au-dessus du haut de la plateforme avant la collision
-            # pour s'assurer qu'on atterrit bien DESSUS.
             if player_rect.bottom - player_y_velocity <= plat_rect.top:
                 player_rect.bottom = plat_rect.top
-                player_y = player_rect.y # On met à jour la variable y
+                player_y = player_rect.y
                 player_y_velocity = 0
                 is_on_ground = True
-                break # Une seule plateforme à la fois
+                break
 
-    # Gestion du saut (uniquement si le joueur est au sol)
+    # Gestion du saut
     if keys[pygame.K_SPACE] and is_on_ground:
         player_y_velocity = jump_strength
 
