@@ -26,7 +26,6 @@ def load_image_or_create_fallback(filename, size, color, is_background=False):
     Si l'image n'est pas trouvée, crée une surface de couleur unie à la place.
     """
     filepath = os.path.join(assets_path, filename)
-    print(f"Tentative de chargement de : {filepath}") # Ligne de débogage ajoutée
     try:
         image = pygame.image.load(filepath)
         if is_background:
