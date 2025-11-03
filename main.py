@@ -13,18 +13,11 @@ clock = pygame.time.Clock()
 FPS = 60
 
 # --- CHEMIN D'ACCÈS ABSOLU AUX ASSETS (pour plus de robustesse) ---
-# Trouve le dossier dans lequel se trouve le script (main.py)
 script_dir = os.path.dirname(os.path.abspath(__file__))
-# Construit le chemin vers le dossier 'assets'
 assets_path = os.path.join(script_dir, "assets")
-
 
 # --- FONCTION DE CHARGEMENT SÉCURISÉE ---
 def load_image_or_create_fallback(filename, size, color, is_background=False):
-    """
-    Tente de charger une image depuis le dossier 'assets' en utilisant un chemin absolu.
-    Si l'image n'est pas trouvée, crée une surface de couleur unie à la place.
-    """
     filepath = os.path.join(assets_path, filename)
     try:
         image = pygame.image.load(filepath)
@@ -48,6 +41,9 @@ player_image = load_image_or_create_fallback("player.png", player_size, (255, 0,
 platform_image = load_image_or_create_fallback("platform.png", platform_size, (0, 255, 0))
 coin_image = load_image_or_create_fallback("coin.png", coin_size, (255, 223, 0))
 background_image = load_image_or_create_fallback("background.png", background_size, (0, 0, 0), is_background=True)
+
+# Correction: Redimensionner l'image de fond pour qu'elle corresponde à l'écran
+background_image = pygame.transform.scale(background_image, (screen_width, screen_height))
 
 
 # --- ÉLÉMENTS DU JEU ---
