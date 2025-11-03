@@ -18,6 +18,7 @@ player_height = 50
 player_x = (screen_width - player_width) / 2
 player_y = screen_height - player_height - 50 # Un peu au-dessus du bas
 player_color = (255, 0, 0) # Rouge
+player_speed = 5
 
 # Boucle principale du jeu
 running = True
@@ -26,6 +27,19 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+
+    # Gestion des touches maintenues enfoncées pour un mouvement continu
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_LEFT]:
+        player_x -= player_speed
+    if keys[pygame.K_RIGHT]:
+        player_x += player_speed
+
+    # Empêcher le joueur de sortir de l'écran
+    if player_x < 0:
+        player_x = 0
+    if player_x > screen_width - player_width:
+        player_x = screen_width - player_width
 
     # Remplissage de l'écran avec une couleur (noir)
     screen.fill((0, 0, 0))
