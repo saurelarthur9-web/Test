@@ -18,17 +18,21 @@ FPS = 60
 # Définition du joueur
 player_width = 40
 player_height = 50
-player_x = (screen_width - player_width) / 2
-player_y = 0 # Commence en haut pour tomber sur les plateformes
+# On utilise directement le Rect pour la position
+player_rect = pygame.Rect(
+    (screen_width - player_width) / 2,
+    0, # Le joueur commence en haut de l'écran
+    player_width,
+    player_height
+)
 player_color = (255, 0, 0) # Rouge
-player_speed = 4 # Vitesse réduite pour un meilleur contrôle
-# On utilise un Rect pour faciliter la détection de collision
-player_rect = pygame.Rect(player_x, player_y, player_width, player_height)
+player_speed = 4
 
 # Physique du joueur
-gravity = 0.8 # Gravité légèrement ajustée pour le nouveau FPS
-jump_strength = -18 # Saut légèrement ajusté
+gravity = 0.8
+jump_strength = -18
 player_y_velocity = 0
+is_on_ground = False
 
 # Plateformes
 platforms_data = [
@@ -50,43 +54,44 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        # Le saut est maintenant géré avec `get_pressed` pour plus de réactivité
 
     # --- LOGIQUE DU JEU ---
 
     # Gestion du clavier
     keys = pygame.key.get_pressed()
 
-    # Mouvement horizontal
+    # --- Mouvement Horizontal ---
     if keys[pygame.K_LEFT]:
-        player_x -= player_speed
+        player_rect.x -= player_speed
     if keys[pygame.K_RIGHT]:
-        player_x += player_speed
+        player_rect.x += player_speed
 
     # Empêcher le joueur de sortir de l'écran (horizontalement)
-    if player_x < 0:
-        player_x = 0
-    if player_x > screen_width - player_width:
-        player_x = screen_width - player_width
+    if player_rect.left < 0:
+        player_rect.left = 0
+    if player_rect.right > screen_width:
+        player_rect.right = screen_width
 
+    # --- Mouvement Vertical et Collisions ---
     # Appliquer la gravité
     player_y_velocity += gravity
-    player_y += player_y_velocity
+    player_rect.y += player_y_velocity
 
-    # Mettre à jour le rect du joueur pour la collision
-    player_rect.topleft = (player_x, player_y)
-
-    # Gestion des collisions avec les plateformes
     is_on_ground = False
+    # Vérifier les collisions avec les plateformes après le mouvement vertical
     for plat_rect in platform_rects:
-        if player_rect.colliderect(plat_rect) and player_y_velocity > 0:
-            if player_rect.bottom - player_y_velocity <= plat_rect.top:
+        # Est-ce qu'il y a collision ?
+        if player_rect.colliderect(plat_rect):
+            # Si le joueur est en train de tomber (vitesse vers le bas)
+            if player_y_velocity > 0:
+                # On replace le joueur sur le dessus de la plateforme
                 player_rect.bottom = plat_rect.top
-                player_y = player_rect.y
                 player_y_velocity = 0
                 is_on_ground = True
-                break
+                break # On ne traite qu'une seule collision à la fois
 
-    # Gestion du saut
+    # --- Saut ---
     if keys[pygame.K_SPACE] and is_on_ground:
         player_y_velocity = jump_strength
 
