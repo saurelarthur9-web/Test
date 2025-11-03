@@ -12,45 +12,49 @@ pygame.display.set_caption("Jeu de Plateforme")
 clock = pygame.time.Clock()
 FPS = 60
 
-# --- CHARGEMENT DES ASSETS (IMAGES) ---
-# NOTE: Vous devez créer un dossier "assets" et y placer vos images.
-# Si les images ne sont pas trouvées, le programme s'arrêtera avec une erreur.
-try:
-    player_image = pygame.image.load(os.path.join("assets", "player.png")).convert_alpha()
-    platform_image = pygame.image.load(os.path.join("assets", "platform.png")).convert_alpha()
-    coin_image = pygame.image.load(os.path.join("assets", "coin.png")).convert_alpha()
-    background_image = pygame.image.load(os.path.join("assets", "background.png")).convert()
-except pygame.error as e:
-    print("Erreur: Fichiers d'images introuvables dans le dossier 'assets'.")
-    print("Veuillez créer 'player.png', 'platform.png', 'coin.png' et 'background.png'.")
-    raise SystemExit(e)
+# --- FONCTION DE CHARGEMENT SÉCURISÉE ---
+def load_image_or_create_fallback(filename, size, color, is_background=False):
+    """
+    Tente de charger une image depuis le dossier 'assets'.
+    Si l'image n'est pas trouvée, crée une surface de couleur unie à la place.
+    """
+    filepath = os.path.join("assets", filename)
+    try:
+        image = pygame.image.load(filepath)
+        if is_background:
+            return image.convert()
+        else:
+            return image.convert_alpha()
+    except pygame.error:
+        print(f"Avertissement: L'image '{filename}' n'a pas été trouvée. Utilisation d'un placeholder.")
+        surface = pygame.Surface(size)
+        surface.fill(color)
+        return surface
+
+# --- CHARGEMENT DES ASSETS ---
+player_size = (40, 50)
+platform_size = (100, 20) # La taille sera étirée, ce n'est qu'un fallback
+coin_size = (30, 30)
+background_size = (screen_width, screen_height)
+
+player_image = load_image_or_create_fallback("player.png", player_size, (255, 0, 0))
+platform_image = load_image_or_create_fallback("platform.png", platform_size, (0, 255, 0))
+coin_image = load_image_or_create_fallback("coin.png", coin_size, (255, 223, 0))
+background_image = load_image_or_create_fallback("background.png", background_size, (0, 0, 0), is_background=True)
+
 
 # --- ÉLÉMENTS DU JEU ---
-
-# Joueur - la taille est maintenant définie par l'image
-player_rect = player_image.get_rect(
-    topleft=((screen_width - player_image.get_width()) / 2, 0)
-)
+player_rect = player_image.get_rect(topleft=((screen_width - player_image.get_width()) / 2, 0))
 player_speed = 4
 gravity = 0.8
 jump_strength = -18
 player_y_velocity = 0
 
-# Plateformes
-platforms_data = [
-    (0, screen_height - 40, screen_width, 40),
-    (200, 450, 150, 20),
-    (450, 350, 100, 20),
-    (100, 250, 100, 20)
-]
+platforms_data = [(0, screen_height - 40, screen_width, 40), (200, 450, 150, 20), (450, 350, 100, 20), (100, 250, 100, 20)]
 platform_rects = [pygame.Rect(p[0], p[1], p[2], p[3]) for p in platforms_data]
 
-# Pièce - la taille est définie par l'image
-coin_rect = coin_image.get_rect(
-    topleft=(125, 250 - coin_image.get_height())
-)
+coin_rect = coin_image.get_rect(topleft=(125, 250 - coin_image.get_height()))
 
-# Police et messages
 font = pygame.font.Font(None, 74)
 small_font = pygame.font.Font(None, 36)
 win_text = font.render("Gagné !", True, (255, 255, 255))
@@ -60,7 +64,6 @@ win_text_rect = win_text.get_rect(center=(screen_width / 2, screen_height / 2 - 
 lose_text_rect = lose_text.get_rect(center=(screen_width / 2, screen_height / 2 - 20))
 restart_text_rect = restart_text.get_rect(center=(screen_width / 2, screen_height / 2 + 30))
 
-# --- VARIABLES D'ÉTAT DU JEU ---
 game_state = "playing"
 
 def reset_game():
@@ -111,7 +114,6 @@ while running:
     screen.blit(background_image, (0, 0))
 
     for plat_rect in platform_rects:
-        # On étire l'image de la plateforme pour qu'elle corresponde à la taille du rectangle
         scaled_platform = pygame.transform.scale(platform_image, (plat_rect.width, plat_rect.height))
         screen.blit(scaled_platform, plat_rect)
 
