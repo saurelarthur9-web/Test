@@ -20,15 +20,13 @@ FPS = 60
 # Joueur
 player_width = 40
 player_height = 50
-player_rect = pygame.Rect(
-    (screen_width - player_width) / 2, 0, player_width, player_height
-)
+player_start_pos = ((screen_width - player_width) / 2, 0)
+player_rect = pygame.Rect(player_start_pos[0], player_start_pos[1], player_width, player_height)
 player_color = (255, 0, 0)
 player_speed = 4
 gravity = 0.8
 jump_strength = -18
 player_y_velocity = 0
-is_on_ground = False
 
 # Plateformes
 platforms_data = [
@@ -42,14 +40,29 @@ platform_color = (0, 255, 0)
 
 # Pièce
 coin_size = 30
-coin_rect = pygame.Rect(125, 250 - coin_size, coin_size, coin_size)
-coin_color = (255, 223, 0) # Jaune/Or
-coin_collected = False
+coin_start_pos = (125, 250 - coin_size)
+coin_rect = pygame.Rect(coin_start_pos[0], coin_start_pos[1], coin_size, coin_size)
+coin_color = (255, 223, 0)
 
-# Police et message de victoire
-font = pygame.font.Font(None, 74) # Utilise la police par défaut de Pygame
-win_text = font.render("Gagné !", True, (255, 255, 255)) # Texte blanc
-win_text_rect = win_text.get_rect(center=(screen_width / 2, screen_height / 2))
+# Police et messages
+font = pygame.font.Font(None, 74)
+small_font = pygame.font.Font(None, 36)
+win_text = font.render("Gagné !", True, (255, 255, 255))
+lose_text = font.render("Perdu !", True, (255, 255, 255))
+restart_text = small_font.render("Appuyez sur R pour recommencer", True, (255, 255, 255))
+win_text_rect = win_text.get_rect(center=(screen_width / 2, screen_height / 2 - 20))
+lose_text_rect = lose_text.get_rect(center=(screen_width / 2, screen_height / 2 - 20))
+restart_text_rect = restart_text.get_rect(center=(screen_width / 2, screen_height / 2 + 30))
+
+# --- VARIABLES D'ÉTAT DU JEU ---
+game_state = "playing" # Peut être "playing", "won", "lost"
+
+def reset_game():
+    global player_y_velocity, game_state
+    player_rect.topleft = player_start_pos
+    coin_rect.topleft = coin_start_pos
+    player_y_velocity = 0
+    game_state = "playing"
 
 # --- BOUCLE PRINCIPALE ---
 running = True
@@ -60,16 +73,18 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_r: # Touche R pour recommencer
+                if game_state in ["won", "lost"]:
+                    reset_game()
 
-    # --- LOGIQUE DU JEU (seulement si le jeu n'est pas gagné) ---
-    if not coin_collected:
+    # --- LOGIQUE DU JEU ---
+    if game_state == "playing":
         keys = pygame.key.get_pressed()
 
         # Mouvement Horizontal
-        if keys[pygame.K_LEFT]:
-            player_rect.x -= player_speed
-        if keys[pygame.K_RIGHT]:
-            player_rect.x += player_speed
+        if keys[pygame.K_LEFT]: player_rect.x -= player_speed
+        if keys[pygame.K_RIGHT]: player_rect.x += player_speed
 
         if player_rect.left < 0: player_rect.left = 0
         if player_rect.right > screen_width: player_rect.right = screen_width
@@ -90,27 +105,32 @@ while running:
         if keys[pygame.K_SPACE] and is_on_ground:
             player_y_velocity = jump_strength
 
-        # Collision avec la pièce
+        # Condition de défaite (tomber dans le vide)
+        if player_rect.top > screen_height:
+            game_state = "lost"
+
+        # Condition de victoire (collecter la pièce)
         if player_rect.colliderect(coin_rect):
-            coin_collected = True
+            game_state = "won"
 
     # --- DESSIN ---
     screen.fill((0, 0, 0))
 
-    # Dessiner les plateformes
     for plat_rect in platform_rects:
         pygame.draw.rect(screen, platform_color, plat_rect)
 
-    # Dessiner la pièce si elle n'est pas collectée
-    if not coin_collected:
+    if game_state != "won": # Ne pas dessiner la pièce si on a déjà gagné
         pygame.draw.rect(screen, coin_color, coin_rect)
 
-    # Dessiner le joueur
     pygame.draw.rect(screen, player_color, player_rect)
 
-    # Afficher le message de victoire si la pièce est collectée
-    if coin_collected:
+    # Affichage des messages de fin de partie
+    if game_state == "won":
         screen.blit(win_text, win_text_rect)
+        screen.blit(restart_text, restart_text_rect)
+    elif game_state == "lost":
+        screen.blit(lose_text, lose_text_rect)
+        screen.blit(restart_text, restart_text_rect)
 
     pygame.display.flip()
 
