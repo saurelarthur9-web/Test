@@ -12,20 +12,27 @@ pygame.display.set_caption("Jeu de Plateforme")
 clock = pygame.time.Clock()
 FPS = 60
 
+# --- CHEMIN D'ACCÈS ABSOLU AUX ASSETS (pour plus de robustesse) ---
+# Trouve le dossier dans lequel se trouve le script (main.py)
+script_dir = os.path.dirname(os.path.abspath(__file__))
+# Construit le chemin vers le dossier 'assets'
+assets_path = os.path.join(script_dir, "assets")
+
+
 # --- FONCTION DE CHARGEMENT SÉCURISÉE ---
 def load_image_or_create_fallback(filename, size, color, is_background=False):
     """
-    Tente de charger une image depuis le dossier 'assets'.
+    Tente de charger une image depuis le dossier 'assets' en utilisant un chemin absolu.
     Si l'image n'est pas trouvée, crée une surface de couleur unie à la place.
     """
-    filepath = os.path.join("assets", filename)
+    filepath = os.path.join(assets_path, filename) # Utilise le chemin absolu
     try:
         image = pygame.image.load(filepath)
         if is_background:
             return image.convert()
         else:
             return image.convert_alpha()
-    except (pygame.error, FileNotFoundError): # Correction ici pour attraper les deux erreurs
+    except (pygame.error, FileNotFoundError):
         print(f"Avertissement: L'image '{filename}' n'a pas été trouvée. Utilisation d'un placeholder.")
         surface = pygame.Surface(size)
         surface.fill(color)
