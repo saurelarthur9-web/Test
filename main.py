@@ -25,7 +25,8 @@ def load_image_or_create_fallback(filename, size, color, is_background=False):
     Tente de charger une image depuis le dossier 'assets' en utilisant un chemin absolu.
     Si l'image n'est pas trouvée, crée une surface de couleur unie à la place.
     """
-    filepath = os.path.join(assets_path, filename) # Utilise le chemin absolu
+    filepath = os.path.join(assets_path, filename)
+    print(f"Tentative de chargement de : {filepath}") # Ligne de débogage ajoutée
     try:
         image = pygame.image.load(filepath)
         if is_background:
