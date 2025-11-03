@@ -15,20 +15,16 @@ pygame.display.set_caption("Jeu de Plateforme")
 clock = pygame.time.Clock()
 FPS = 60
 
-# Définition du joueur
+# --- ÉLÉMENTS DU JEU ---
+
+# Joueur
 player_width = 40
 player_height = 50
-# On utilise directement le Rect pour la position
 player_rect = pygame.Rect(
-    (screen_width - player_width) / 2,
-    0, # Le joueur commence en haut de l'écran
-    player_width,
-    player_height
+    (screen_width - player_width) / 2, 0, player_width, player_height
 )
-player_color = (255, 0, 0) # Rouge
+player_color = (255, 0, 0)
 player_speed = 4
-
-# Physique du joueur
 gravity = 0.8
 jump_strength = -18
 player_y_velocity = 0
@@ -42,73 +38,80 @@ platforms_data = [
     (100, 250, 100, 20)
 ]
 platform_rects = [pygame.Rect(p[0], p[1], p[2], p[3]) for p in platforms_data]
-platform_color = (0, 255, 0) # Vert
+platform_color = (0, 255, 0)
 
-# Boucle principale du jeu
+# Pièce
+coin_size = 30
+coin_rect = pygame.Rect(125, 250 - coin_size, coin_size, coin_size)
+coin_color = (255, 223, 0) # Jaune/Or
+coin_collected = False
+
+# Police et message de victoire
+font = pygame.font.Font(None, 74) # Utilise la police par défaut de Pygame
+win_text = font.render("Gagné !", True, (255, 255, 255)) # Texte blanc
+win_text_rect = win_text.get_rect(center=(screen_width / 2, screen_height / 2))
+
+# --- BOUCLE PRINCIPALE ---
 running = True
 while running:
-    # Réguler le FPS
     clock.tick(FPS)
 
-    # Gestion des événements
+    # --- GESTION DES ÉVÉNEMENTS ---
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        # Le saut est maintenant géré avec `get_pressed` pour plus de réactivité
 
-    # --- LOGIQUE DU JEU ---
+    # --- LOGIQUE DU JEU (seulement si le jeu n'est pas gagné) ---
+    if not coin_collected:
+        keys = pygame.key.get_pressed()
 
-    # Gestion du clavier
-    keys = pygame.key.get_pressed()
+        # Mouvement Horizontal
+        if keys[pygame.K_LEFT]:
+            player_rect.x -= player_speed
+        if keys[pygame.K_RIGHT]:
+            player_rect.x += player_speed
 
-    # --- Mouvement Horizontal ---
-    if keys[pygame.K_LEFT]:
-        player_rect.x -= player_speed
-    if keys[pygame.K_RIGHT]:
-        player_rect.x += player_speed
+        if player_rect.left < 0: player_rect.left = 0
+        if player_rect.right > screen_width: player_rect.right = screen_width
 
-    # Empêcher le joueur de sortir de l'écran (horizontalement)
-    if player_rect.left < 0:
-        player_rect.left = 0
-    if player_rect.right > screen_width:
-        player_rect.right = screen_width
+        # Mouvement Vertical et Collisions
+        player_y_velocity += gravity
+        player_rect.y += player_y_velocity
 
-    # --- Mouvement Vertical et Collisions ---
-    # Appliquer la gravité
-    player_y_velocity += gravity
-    player_rect.y += player_y_velocity
-
-    is_on_ground = False
-    # Vérifier les collisions avec les plateformes après le mouvement vertical
-    for plat_rect in platform_rects:
-        # Est-ce qu'il y a collision ?
-        if player_rect.colliderect(plat_rect):
-            # Si le joueur est en train de tomber (vitesse vers le bas)
-            if player_y_velocity > 0:
-                # On replace le joueur sur le dessus de la plateforme
+        is_on_ground = False
+        for plat_rect in platform_rects:
+            if player_rect.colliderect(plat_rect) and player_y_velocity > 0:
                 player_rect.bottom = plat_rect.top
                 player_y_velocity = 0
                 is_on_ground = True
-                break # On ne traite qu'une seule collision à la fois
+                break
 
-    # --- Saut ---
-    if keys[pygame.K_SPACE] and is_on_ground:
-        player_y_velocity = jump_strength
+        # Saut
+        if keys[pygame.K_SPACE] and is_on_ground:
+            player_y_velocity = jump_strength
+
+        # Collision avec la pièce
+        if player_rect.colliderect(coin_rect):
+            coin_collected = True
 
     # --- DESSIN ---
-
-    # Remplissage de l'écran
-    screen.fill((0, 0, 0)) # Noir
+    screen.fill((0, 0, 0))
 
     # Dessiner les plateformes
     for plat_rect in platform_rects:
         pygame.draw.rect(screen, platform_color, plat_rect)
 
+    # Dessiner la pièce si elle n'est pas collectée
+    if not coin_collected:
+        pygame.draw.rect(screen, coin_color, coin_rect)
+
     # Dessiner le joueur
     pygame.draw.rect(screen, player_color, player_rect)
 
-    # Mise à jour de l'affichage
+    # Afficher le message de victoire si la pièce est collectée
+    if coin_collected:
+        screen.blit(win_text, win_text_rect)
+
     pygame.display.flip()
 
-# Quitter Pygame
 pygame.quit()
