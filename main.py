@@ -32,8 +32,7 @@ def load_image_or_create_fallback(filename, size, color, is_background=False):
 
 def load_sound_or_dummy(filename):
     filepath = os.path.join(sounds_path, filename)
-    try:
-        return pygame.mixer.Sound(filepath)
+    try: return pygame.mixer.Sound(filepath)
     except (pygame.error, FileNotFoundError):
         print(f"Avertissement: Le son '{filename}' n'a pas été trouvé.")
         class DummySound:
@@ -52,51 +51,55 @@ def draw_text_with_outline(surface, text, font, pos, text_color, outline_color):
 player_image = load_image_or_create_fallback("player.png", (40, 50), (255, 0, 0))
 platform_image = load_image_or_create_fallback("platform.png", (40, 40), (0, 255, 0))
 coin_image = load_image_or_create_fallback("coin.png", (30, 30), (255, 223, 0))
+enemy_image = load_image_or_create_fallback("enemy.png", (40, 40), (150, 0, 255))
 background_image = load_image_or_create_fallback("background.png", (screen_width, screen_height), (0, 0, 0), True)
 background_image = pygame.transform.scale(background_image, (screen_width, screen_height))
 
-jump_sound = load_sound_or_dummy("jump.ogg")
-coin_sound = load_sound_or_dummy("coin.ogg")
+jump_sound = load_sound_or_dummy("jump.ogg"); coin_sound = load_sound_or_dummy("coin.ogg"); enemy_stomp_sound = load_sound_or_dummy("stomp.ogg")
 try:
     pygame.mixer.music.load(os.path.join(sounds_path, "music.mp3"))
     pygame.mixer.music.play(-1)
 except pygame.error:
     print("Avertissement: La musique 'music.mp3' n'a pas été trouvée.")
 
+# --- CLASSES DU JEU ---
+class Enemy:
+    def __init__(self, x, y, speed, patrol_range):
+        self.image = enemy_image; self.rect = self.image.get_rect(topleft=(x, y))
+        self.speed = speed; self.direction = 1; self.start_x = x; self.patrol_range = patrol_range
+    def update(self):
+        self.rect.x += self.speed * self.direction
+        if self.rect.x <= self.start_x or self.rect.x >= self.start_x + self.patrol_range: self.direction *= -1
+    def draw(self, surface): surface.blit(self.image, self.rect)
+
 # --- STRUCTURE DES NIVEAUX ---
 levels = [
-    { # Niveau 1
-        "platforms": [(0, 560, 800, 40), (200, 450, 160, 40), (450, 350, 120, 40), (100, 250, 120, 40)],
-        "coins": [(475, 320), (250, 420), (125, 220)] # Position de la pièce ajustée
-    },
-    { # Niveau 2
-        "platforms": [(0, 560, 800, 40), (100, 480, 120, 40), (300, 380, 120, 40), (500, 280, 120, 40), (250, 180, 120, 40)],
-        "coins": [(130, 450), (330, 350), (530, 250), (280, 150)]
-    }
+    {"platforms": [(0, 560, 800, 40), (200, 450, 160, 40), (450, 350, 120, 40), (150, 250, 120, 40)], "coins": [(475, 320), (250, 420), (175, 220)], "enemies": [(220, 410, 2, 100)]},
+    {"platforms": [(0, 560, 800, 40), (100, 480, 120, 40), (300, 380, 120, 40), (500, 280, 120, 40), (250, 180, 120, 40)], "coins": [(130, 450), (330, 350), (530, 250), (280, 150)], "enemies": [(110, 440, 2, 80), (310, 340, 3, 80)]}
 ]
 
 # --- VARIABLES DU JEU ---
-player_hitbox = pygame.Rect(380, 0, 25, 45)
-player_speed = 4; gravity = 0.8; jump_strength = -18; player_y_velocity = 0; is_on_ground = False
-platform_rects = []; coin_rects = []
-score = 0; current_level_index = 0
-start_time = 0; elapsed_time = 0
-font = pygame.font.Font(None, 74); small_font = pygame.font.Font(None, 36); score_font = pygame.font.Font(None, 40)
-game_state = "playing"
+player_hitbox = pygame.Rect(380, 0, 25, 45); player_speed = 4; gravity = 0.7; jump_strength = -19; player_y_velocity = 0; is_on_ground = False
+bounce_strength = -10
+platform_rects = []; coin_rects = []; enemies = []
+score = 0; current_level_index = 0; start_time = 0; elapsed_time = 0
+font = pygame.font.Font(None, 74); big_font = pygame.font.Font(None, 100) ; small_font = pygame.font.Font(None, 36); score_font = pygame.font.Font(None, 40)
+game_state = "start_screen" # Le jeu commence sur l'écran titre
 
 def load_level(level_index):
-    global platform_rects, coin_rects, player_y_velocity, start_time
+    global platform_rects, coin_rects, enemies, player_y_velocity
     level_data = levels[level_index]
     platform_rects = [pygame.Rect(p[0], p[1], p[2], p[3]) for p in level_data["platforms"]]
     coin_rects = [coin_image.get_rect(topleft=pos) for pos in level_data["coins"]]
+    enemies = [Enemy(e[0], e[1], e[2], e[3]) for e in level_data["enemies"]]
     player_hitbox.topleft = (380, 0); player_y_velocity = 0
-    start_time = pygame.time.get_ticks() # Réinitialise le timer
 
 def reset_game():
-    global game_state, score, current_level_index
+    global game_state, score, current_level_index, start_time
     score = 0; current_level_index = 0; load_level(0); game_state = "playing"
+    start_time = pygame.time.get_ticks()
 
-reset_game()
+# Pas d'appel à reset_game() ici, on attend sur l'écran titre
 
 # --- BOUCLE PRINCIPALE ---
 running = True
@@ -104,14 +107,16 @@ while running:
     clock.tick(FPS)
     for event in pygame.event.get():
         if event.type == pygame.QUIT: running = False
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_r and game_state in ["won", "lost"]:
-            reset_game()
+        if event.type == pygame.KEYDOWN:
+            if game_state == "start_screen":
+                reset_game() # Démarre le jeu
+            elif game_state in ["won", "lost"] and event.key == pygame.K_r:
+                reset_game()
 
     if game_state == "playing":
-        # Mise à jour du timer
         elapsed_time = (pygame.time.get_ticks() - start_time) // 1000
-
         keys = pygame.key.get_pressed()
+
         player_hitbox.x += (keys[pygame.K_RIGHT] - keys[pygame.K_LEFT]) * player_speed
         for plat_rect in platform_rects:
             if player_hitbox.colliderect(plat_rect):
@@ -119,8 +124,7 @@ while running:
                 elif (keys[pygame.K_RIGHT] - keys[pygame.K_LEFT]) < 0: player_hitbox.left = plat_rect.right
 
         if keys[pygame.K_SPACE] and is_on_ground:
-            player_y_velocity = jump_strength
-            jump_sound.play()
+            player_y_velocity = jump_strength; jump_sound.play()
 
         player_y_velocity += gravity
         player_hitbox.y += player_y_velocity
@@ -128,12 +132,16 @@ while running:
         for plat_rect in platform_rects:
             if player_hitbox.colliderect(plat_rect):
                 if player_y_velocity > 0:
-                    player_hitbox.bottom = plat_rect.top
-                    is_on_ground = True
-                    player_y_velocity = 0
+                    player_hitbox.bottom = plat_rect.top; is_on_ground = True; player_y_velocity = 0
                 elif player_y_velocity < 0:
-                    player_hitbox.top = plat_rect.bottom
-                    player_y_velocity = 0
+                    player_hitbox.top = plat_rect.bottom; player_y_velocity = 0
+
+        for i, enemy in reversed(list(enumerate(enemies))):
+            enemy.update()
+            if player_hitbox.colliderect(enemy.rect):
+                if player_y_velocity > 0 and player_hitbox.bottom < enemy.rect.centery:
+                    enemies.pop(i); enemy_stomp_sound.play(); player_y_velocity = bounce_strength
+                else: load_level(current_level_index)
 
         coin_index = player_hitbox.collidelist(coin_rects)
         if coin_index != -1:
@@ -148,29 +156,35 @@ while running:
 
     # --- DESSIN ---
     screen.blit(background_image, (0, 0))
-    if game_state == "playing":
+    if game_state == "start_screen":
+        title_rect = big_font.render("Mon Super Jeu", True, (0,0,0)).get_rect(center=(screen_width / 2, screen_height / 2 - 50))
+        draw_text_with_outline(screen, "Mon Super Jeu", big_font, title_rect.topleft, (255, 255, 255), (0, 0, 0))
+        start_rect = small_font.render("Appuyez sur une touche pour commencer", True, (0,0,0)).get_rect(center=(screen_width / 2, screen_height / 2 + 50))
+        draw_text_with_outline(screen, "Appuyez sur une touche pour commencer", small_font, start_rect.topleft, (255, 255, 255), (0, 0, 0))
+
+    elif game_state == "playing":
         for plat_rect in platform_rects:
             for x in range(plat_rect.left, plat_rect.right, platform_image.get_width()):
                 screen.blit(platform_image, (x, plat_rect.top))
         for coin in coin_rects: screen.blit(coin_image, coin)
+        for enemy in enemies: enemy.draw(screen)
 
         image_rect = player_image.get_rect(centerx=player_hitbox.centerx, bottom=player_hitbox.bottom)
         screen.blit(player_image, image_rect)
 
-        draw_text_with_outline(screen, f"Score: {score}", score_font, (10, 10), (255, 255, 255), (0, 0, 0))
-        draw_text_with_outline(screen, f"Niveau: {current_level_index + 1}", score_font, (screen_width - 150, 10), (255, 255, 255), (0, 0, 0))
-
-        # Afficher le timer
-        timer_text = f"Temps: {elapsed_time}"
-        timer_rect = score_font.render(timer_text, True, (0,0,0)).get_rect(centerx=screen_width/2)
-        timer_rect.top = 10
-        draw_text_with_outline(screen, timer_text, score_font, timer_rect.topleft, (255, 255, 255), (0, 0, 0))
+        draw_text_with_outline(screen, f"Score: {score}", score_font, (10, 10), (255,255,255), (0,0,0))
+        draw_text_with_outline(screen, f"Niveau: {current_level_index + 1}", score_font, (screen_width - 150, 10), (255,255,255), (0,0,0))
+        timer_text = f"Temps: {elapsed_time}"; timer_rect = score_font.render(timer_text, True, (0,0,0)).get_rect(centerx=screen_width/2); timer_rect.top = 10
+        draw_text_with_outline(screen, timer_text, score_font, timer_rect.topleft, (255,255,255), (0,0,0))
 
     elif game_state == "won":
         win_rect = font.render("Gagné !", True, (0,0,0)).get_rect(center=(screen_width / 2, screen_height / 2 - 20))
         draw_text_with_outline(screen, "Gagné !", font, win_rect.topleft, (255, 255, 255), (0, 0, 0))
-        restart_rect = small_font.render("Appuyez sur R pour recommencer", True, (0,0,0)).get_rect(center=(screen_width / 2, screen_height / 2 + 30))
-        draw_text_with_outline(screen, "Appuyez sur R pour recommencer", small_font, restart_rect.topleft, (255, 255, 255), (0, 0, 0))
+        final_time_text = f"Votre temps: {elapsed_time}s"
+        final_time_rect = small_font.render(final_time_text, True, (0,0,0)).get_rect(center=(screen_width / 2, screen_height / 2 + 30))
+        draw_text_with_outline(screen, final_time_text, small_font, final_time_rect.topleft, (255, 255, 255), (0, 0, 0))
+        restart_rect = small_font.render("Appuyez sur R pour recommencer", True, (0,0,0)).get_rect(center=(screen_width / 2, screen_height / 2 + 70))
+        draw_text_with_outline(screen, "Appuyez sur R pour recommencer", small_font, restart_rect.topleft, (255,255,255), (0,0,0))
 
     pygame.display.flip()
 pygame.quit()
