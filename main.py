@@ -3,12 +3,15 @@ import os
 
 # --- INITIALISATION ---
 pygame.init()
-pygame.mixer.init()
+try:
+    pygame.mixer.init()
+except pygame.error as e:
+    print(f"Avertissement: Impossible d'initialiser le mixer audio : {e}")
 
 screen_width = 800
 screen_height = 600
 screen = pygame.display.set_mode((screen_width, screen_height))
-pygame.display.set_caption("Jeu de Plateforme")
+pygame.display.set_caption("Loris L'Astronaute") # Titre de la fenêtre mis à jour
 
 clock = pygame.time.Clock()
 FPS = 60
@@ -72,6 +75,35 @@ class Enemy:
         if self.rect.x <= self.start_x or self.rect.x >= self.start_x + self.patrol_range: self.direction *= -1
     def draw(self, surface): surface.blit(self.image, self.rect)
 
+class Button:
+    def __init__(self, x, y, width, height, text, font, base_color, hover_color):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.font = font
+        self.base_color = base_color
+        self.hover_color = hover_color
+        self.current_color = base_color
+
+    def draw(self, surface):
+        pygame.draw.rect(surface, self.current_color, self.rect, border_radius=10)
+        text_width, text_height = self.font.size(self.text)
+        draw_text_with_outline(surface, self.text, self.font,
+                               (self.rect.centerx - text_width / 2,
+                                self.rect.centery - text_height / 2),
+                               (255, 255, 255), (0, 0, 0))
+
+    def check_hover(self, mouse_pos):
+        if self.rect.collidepoint(mouse_pos):
+            self.current_color = self.hover_color
+        else:
+            self.current_color = self.base_color
+
+    def check_click(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.rect.collidepoint(event.pos):
+                return True
+        return False
+
 # --- STRUCTURE DES NIVEAUX ---
 levels = [
     {"platforms": [(0, 560, 800, 40), (200, 450, 160, 40), (450, 350, 120, 40), (150, 250, 120, 40)], "coins": [(475, 320), (250, 420), (175, 220)], "enemies": [(220, 410, 2, 100)]},
@@ -83,8 +115,16 @@ player_hitbox = pygame.Rect(380, 0, 25, 45); player_speed = 4; gravity = 0.7; ju
 bounce_strength = -10
 platform_rects = []; coin_rects = []; enemies = []
 score = 0; current_level_index = 0; start_time = 0; elapsed_time = 0
-font = pygame.font.Font(None, 74); big_font = pygame.font.Font(None, 100) ; small_font = pygame.font.Font(None, 36); score_font = pygame.font.Font(None, 40)
-game_state = "start_screen" # Le jeu commence sur l'écran titre
+font = pygame.font.Font(None, 74); big_font = pygame.font.Font(None, 80) ; small_font = pygame.font.Font(None, 36); score_font = pygame.font.Font(None, 40)
+game_state = "start_screen"
+
+# --- Création des boutons ---
+button_font = pygame.font.Font(None, 50)
+play_button = Button(300, 250, 200, 50, "Jouer", button_font, (100, 100, 100), (150, 150, 150))
+credits_button = Button(300, 320, 200, 50, "Crédits", button_font, (100, 100, 100), (150, 150, 150))
+back_button = Button(300, 500, 200, 50, "Retour", button_font, (100, 100, 100), (150, 150, 150))
+restart_button = Button(300, 250, 200, 50, "Recommencer", button_font, (100, 100, 100), (150, 150, 150))
+main_menu_button = Button(300, 320, 200, 50, "Menu Principal", button_font, (100, 100, 100), (150, 150, 150))
 
 def load_level(level_index):
     global platform_rects, coin_rects, enemies, player_y_velocity
@@ -99,18 +139,32 @@ def reset_game():
     score = 0; current_level_index = 0; load_level(0); game_state = "playing"
     start_time = pygame.time.get_ticks()
 
-# Pas d'appel à reset_game() ici, on attend sur l'écran titre
-
 # --- BOUCLE PRINCIPALE ---
 running = True
 while running:
     clock.tick(FPS)
+    mouse_pos = pygame.mouse.get_pos()
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT: running = False
+
+        if game_state == "start_screen":
+            if play_button.check_click(event):
+                reset_game()
+            if credits_button.check_click(event):
+                game_state = "credits_screen"
+        elif game_state == "credits_screen":
+            if back_button.check_click(event):
+                game_state = "start_screen"
+        elif game_state == "game_over":
+            if restart_button.check_click(event):
+                load_level(current_level_index)
+                game_state = "playing"
+            if main_menu_button.check_click(event):
+                game_state = "start_screen"
+
         if event.type == pygame.KEYDOWN:
-            if game_state == "start_screen":
-                reset_game() # Démarre le jeu
-            elif game_state in ["won", "lost"] and event.key == pygame.K_r:
+            if game_state == "won" and event.key == pygame.K_r:
                 reset_game()
 
     if game_state == "playing":
@@ -141,13 +195,13 @@ while running:
             if player_hitbox.colliderect(enemy.rect):
                 if player_y_velocity > 0 and player_hitbox.bottom < enemy.rect.centery:
                     enemies.pop(i); enemy_stomp_sound.play(); player_y_velocity = bounce_strength
-                else: load_level(current_level_index)
+                else: game_state = "game_over"
 
         coin_index = player_hitbox.collidelist(coin_rects)
         if coin_index != -1:
             coin_rects.pop(coin_index); score += 1; coin_sound.play()
 
-        if player_hitbox.top > screen_height: load_level(current_level_index)
+        if player_hitbox.top > screen_height: game_state = "game_over"
 
         if not coin_rects:
             current_level_index += 1
@@ -157,10 +211,30 @@ while running:
     # --- DESSIN ---
     screen.blit(background_image, (0, 0))
     if game_state == "start_screen":
-        title_rect = big_font.render("Mon Super Jeu", True, (0,0,0)).get_rect(center=(screen_width / 2, screen_height / 2 - 50))
-        draw_text_with_outline(screen, "Mon Super Jeu", big_font, title_rect.topleft, (255, 255, 255), (0, 0, 0))
-        start_rect = small_font.render("Appuyez sur une touche pour commencer", True, (0,0,0)).get_rect(center=(screen_width / 2, screen_height / 2 + 50))
-        draw_text_with_outline(screen, "Appuyez sur une touche pour commencer", small_font, start_rect.topleft, (255, 255, 255), (0, 0, 0))
+        title_rect = big_font.render("Loris L'Astronaute", True, (0,0,0)).get_rect(center=(screen_width / 2, screen_height / 2 - 100))
+        draw_text_with_outline(screen, "Loris L'Astronaute", big_font, title_rect.topleft, (255, 255, 255), (0, 0, 0))
+
+        play_button.check_hover(mouse_pos)
+        play_button.draw(screen)
+        credits_button.check_hover(mouse_pos)
+        credits_button.draw(screen)
+
+    elif game_state == "credits_screen":
+        credits_title_rect = big_font.render("Crédits", True, (0,0,0)).get_rect(center=(screen_width / 2, 100))
+        draw_text_with_outline(screen, "Crédits", big_font, credits_title_rect.topleft, (255, 255, 255), (0, 0, 0))
+
+        credits_text = [
+            "Jeu développé par : Vous !",
+            "Idée originale : Loris",
+            "Moteur de jeu : Pygame"
+        ]
+
+        for i, line in enumerate(credits_text):
+            line_rect = small_font.render(line, True, (0,0,0)).get_rect(center=(screen_width / 2, 250 + i * 40))
+            draw_text_with_outline(screen, line, small_font, line_rect.topleft, (255, 255, 255), (0, 0, 0))
+
+        back_button.check_hover(mouse_pos)
+        back_button.draw(screen)
 
     elif game_state == "playing":
         for plat_rect in platform_rects:
@@ -176,6 +250,15 @@ while running:
         draw_text_with_outline(screen, f"Niveau: {current_level_index + 1}", score_font, (screen_width - 150, 10), (255,255,255), (0,0,0))
         timer_text = f"Temps: {elapsed_time}"; timer_rect = score_font.render(timer_text, True, (0,0,0)).get_rect(centerx=screen_width/2); timer_rect.top = 10
         draw_text_with_outline(screen, timer_text, score_font, timer_rect.topleft, (255,255,255), (0,0,0))
+
+    elif game_state == "game_over":
+        game_over_rect = big_font.render("Game Over", True, (0,0,0)).get_rect(center=(screen_width / 2, screen_height / 2 - 100))
+        draw_text_with_outline(screen, "Game Over", big_font, game_over_rect.topleft, (255, 0, 0), (0, 0, 0))
+
+        restart_button.check_hover(mouse_pos)
+        restart_button.draw(screen)
+        main_menu_button.check_hover(mouse_pos)
+        main_menu_button.draw(screen)
 
     elif game_state == "won":
         win_rect = font.render("Gagné !", True, (0,0,0)).get_rect(center=(screen_width / 2, screen_height / 2 - 20))
