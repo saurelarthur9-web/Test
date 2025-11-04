@@ -72,31 +72,59 @@ class Enemy:
         self.rect = self.image.get_rect(topleft=(x, y))
         self.speed = speed
         self.direction = 1
-        self.patrol_range = patrol_range # Can still be used for static platforms if needed
+        self.patrol_range = patrol_range
         self.start_x = x
+        self.y_velocity = 0
+        self.is_on_ground = False
 
     def update(self, platforms):
-        self.rect.x += self.speed * self.direction
+        # Apply gravity
+        self.y_velocity += gravity
+        self.rect.y += self.y_velocity
+        self.is_on_ground = False
 
-        # Check for platform edges
-        on_platform = False
+        # Vertical collision with platforms
         for plat_rect in platforms:
-            # Check if enemy is on top of this platform
-            if self.rect.bottom == plat_rect.top and self.rect.left < plat_rect.right and self.rect.right > plat_rect.left:
-                on_platform = True
-                # Turn around at edges
-                if self.rect.right > plat_rect.right or self.rect.left < plat_rect.left:
-                    self.direction *= -1
+            if self.rect.colliderect(plat_rect):
+                if self.y_velocity > 0:
+                    self.rect.bottom = plat_rect.top
+                    self.is_on_ground = True
+                    self.y_velocity = 0
+                elif self.y_velocity < 0:
+                    self.rect.top = plat_rect.bottom
+                    self.y_velocity = 0
 
-                # Move with horizontal moving platforms
+        # Horizontal movement and edge detection only if on ground
+        if self.is_on_ground:
+            self.rect.x += self.speed * self.direction
+
+            # Find the platform the enemy is on
+            current_platform_rect = None
+            for plat_rect in platforms:
+                # A small rectangle below the enemy to check for ground
+                ground_check_rect = pygame.Rect(self.rect.x, self.rect.bottom, self.rect.width, 1)
+                if ground_check_rect.colliderect(plat_rect):
+                    current_platform_rect = plat_rect
+                    break
+
+            if current_platform_rect:
+                # Move with platform
                 for p in moving_platforms:
-                    if p.rect == plat_rect and p.move_direction == 'horizontal':
+                    if p.rect == current_platform_rect:
                         self.rect.x += p.speed * p.direction
-                break
+                        break
 
-        if not on_platform:
-            # If not on any platform, reverse direction (simple way to handle falling off)
-            self.direction *= -1
+                # Edge detection
+                if self.direction == 1 and self.rect.right >= current_platform_rect.right:
+                    self.rect.right = current_platform_rect.right
+                    self.direction = -1
+                elif self.direction == -1 and self.rect.left <= current_platform_rect.left:
+                    self.rect.left = current_platform_rect.left
+                    self.direction = 1
+            else:
+                # If there's no platform underneath, turn around
+                self.direction *= -1
+
 
     def draw(self, surface):
         surface.blit(self.image, self.rect)
@@ -224,7 +252,7 @@ levels = [
 ]
 
 # --- VARIABLES DU JEU ---
-player_hitbox = pygame.Rect(380, 0, 25, 45); player_speed = 4; gravity = 0.7; jump_strength = -19; player_y_velocity = 0; is_on_ground = False
+player_hitbox = pygame.Rect(380, 0, 23, 45); player_speed = 4; gravity = 0.7; jump_strength = -19; player_y_velocity = 0; is_on_ground = False
 bounce_strength = -10
 platform_rects = []; moving_platforms = []; coin_rects = []; enemies = []; jumping_enemies = []
 score = 0; current_level_index = 0; start_time = 0; elapsed_time = 0; player_lives = 3; unlocked_levels = 1; infinite_lives = False
@@ -339,8 +367,14 @@ while running:
                         if p.rect == plat_rect:
                             if p.move_direction == 'horizontal':
                                 player_hitbox.x += p.speed * p.direction
-                            else: # vertical
+                            else: # vertical, check for collision above
+                                original_y = player_hitbox.y
                                 player_hitbox.y += p.speed * p.direction
+                                for other_plat in all_platforms_for_vertical_collision:
+                                    if other_plat != plat_rect and player_hitbox.colliderect(other_plat):
+                                        player_hitbox.y = original_y # cancel move
+                                        break
+
                 elif player_y_velocity < 0:
                     player_hitbox.top = plat_rect.bottom; player_y_velocity = 0
 
