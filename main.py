@@ -78,59 +78,64 @@ class Enemy:
         self.is_on_ground = False
 
     def update(self, platforms):
-        # Horizontal Movement
-        self.rect.x += self.speed * self.direction
-
-        # Horizontal collision with platforms
-        for plat_rect in platforms:
-            if self.rect.colliderect(plat_rect):
-                if self.direction > 0: # Moving right
-                    self.rect.right = plat_rect.left
-                    self.direction = -1
-                elif self.direction < 0: # Moving left
-                    self.rect.left = plat_rect.right
-                    self.direction = 1
-
-        # Vertical Movement (Gravity)
+        # --- 1. Vertical Physics (Apply gravity and check for ground) ---
         self.y_velocity += gravity
         self.rect.y += self.y_velocity
-
         self.is_on_ground = False
-        # Vertical collision with platforms
+
         for plat_rect in platforms:
             if self.rect.colliderect(plat_rect):
-                if self.y_velocity > 0:
+                if self.y_velocity > 0: # Moving down
                     self.rect.bottom = plat_rect.top
                     self.is_on_ground = True
                     self.y_velocity = 0
-                elif self.y_velocity < 0:
+                elif self.y_velocity < 0: # Moving up
                     self.rect.top = plat_rect.bottom
                     self.y_velocity = 0
 
-        # Stick to moving platforms and edge detection
+        # --- 2. Horizontal Logic (Only run if on a platform) ---
         if self.is_on_ground:
-            on_any_platform = False
-            # Check for ground below the enemy
-            ground_probe_left = pygame.Rect(self.rect.left, self.rect.bottom, 1, 1)
-            ground_probe_right = pygame.Rect(self.rect.right - 1, self.rect.bottom, 1, 1)
+            # First, check for edges BEFORE moving.
+            # Create a probe just in front of the enemy's feet to see if there's ground to walk on.
+            probe_x = self.rect.right if self.direction > 0 else self.rect.left - 1
+            ground_probe = pygame.Rect(probe_x, self.rect.bottom, 1, 1)
 
-            ground_platform = None
+            found_ground_ahead = False
+            current_platform = None # The platform the enemy is currently on
+
             for plat_rect in platforms:
-                if ground_probe_left.colliderect(plat_rect) or ground_probe_right.colliderect(plat_rect):
-                    on_any_platform = True
-                    ground_platform = plat_rect
-                    break
+                if ground_probe.colliderect(plat_rect):
+                    found_ground_ahead = True
 
-            if on_any_platform:
-                 # Stick to moving platforms
-                for p in moving_platforms:
-                    if p.rect == ground_platform:
-                        if p.move_direction == 'horizontal':
-                            self.rect.x += p.speed * p.direction
+                # Also check what platform we are currently on for moving platform logic
+                probe_under = pygame.Rect(self.rect.centerx, self.rect.bottom, 1, 5)
+                if probe_under.colliderect(plat_rect):
+                    current_platform = plat_rect
+
+            # If there's no ground ahead, turn around.
+            if not found_ground_ahead:
+                self.direction *= -1
+
+            # Now, move the enemy horizontally.
+            move_x = self.speed * self.direction
+            self.rect.x += move_x
+
+            # Handle sticking to a moving platform we might be on
+            if current_platform:
+                 for p in moving_platforms:
+                    if p.rect == current_platform and p.move_direction == 'horizontal':
+                        self.rect.x += p.speed * p.direction
                         break
-            else:
-                 # If there is no platform under the enemy's feet, it should turn around
-                 self.direction *= -1
+
+            # Finally, check for collisions with walls after moving.
+            for plat_rect in platforms:
+                if self.rect.colliderect(plat_rect):
+                    if move_x > 0: # Hit a wall while moving right
+                        self.rect.right = plat_rect.left
+                        self.direction = -1
+                    elif move_x < 0: # Hit a wall while moving left
+                        self.rect.left = plat_rect.right
+                        self.direction = 1
 
 
     def draw(self, surface):
@@ -255,72 +260,6 @@ levels = [
     {"platforms": [(0, 560, 150, 40), (350, 560, 100, 40), (650, 560, 150, 40), (350, 200, 100, 40)],
      "moving_platforms": [(200, 500, 100, 40, 3, 250, 'horizontal'), (500, 350, 100, 40, 2, 150, 'vertical')],
      "coins": [(100, 530), (700, 530), (250, 470), (550, 320), (400, 170)],
-     "jumping_enemies": []},
-    # NIVEAU 5
-    {"platforms": [(0, 560, 800, 40)],
-     "moving_platforms": [
-         (100, 480, 100, 40, 2, 150, 'horizontal'),
-         (350, 380, 100, 40, 2, 150, 'horizontal'),
-         (600, 280, 100, 40, 2, 150, 'horizontal')
-     ],
-     "coins": [(150, 450), (400, 350), (650, 250)],
-     "enemies": [(120, 440, 3, 110), (370, 340, 3, 110)],
-     "jumping_enemies": [(500, 520, 15, 2000)]},
-    # NIVEAU 6
-    {"platforms": [(0, 560, 150, 40), (650, 560, 150, 40)],
-     "moving_platforms": [
-         (200, 500, 100, 40, 4, 250, 'horizontal'),
-         (350, 400, 100, 40, 3, 200, 'vertical'),
-         (50, 300, 100, 40, 2, 150, 'horizontal')
-     ],
-     "coins": [(100, 530), (700, 530), (250, 470), (400, 300), (100, 270)],
-     "enemies": [(50, 520, 4, 80)],
-     "jumping_enemies": [(680, 520, 15, 1800)]},
-    # NIVEAU 7
-    {"platforms": [(0, 560, 800, 40)],
-     "moving_platforms": [
-         (100, 450, 80, 40, 3, 100, 'vertical'),
-         (300, 450, 80, 40, 3, 100, 'vertical'),
-         (500, 450, 80, 40, 3, 100, 'vertical'),
-         (200, 250, 150, 40, 4, 250, 'horizontal')
-     ],
-     "coins": [(120, 350), (320, 350), (520, 350), (300, 220)],
-     "enemies": [(250, 210, 5, 100)],
-     "jumping_enemies": [(100, 520, 16, 1500), (600, 520, 16, 1600)]},
-    # NIVEAU 8
-    {"platforms": [(0, 560, 100, 40), (700, 560, 100, 40)],
-     "moving_platforms": [
-         (150, 500, 100, 40, 5, 200, 'horizontal'),
-         (450, 500, 100, 40, 5, 200, 'horizontal'),
-         (300, 300, 150, 40, 3, 150, 'vertical'),
-         (100, 200, 100, 40, 4, 400, 'horizontal')
-     ],
-     "coins": [(50, 530), (750, 530), (200, 470), (500, 470), (350, 250), (300, 170)],
-     "enemies": [(180, 460, 6, 140), (480, 460, 6, 140)],
-     "jumping_enemies": []},
-    # NIVEAU 9
-    {"platforms": [(350, 560, 100, 40)],
-     "moving_platforms": [
-         (0, 500, 100, 40, 6, 200, 'horizontal'),
-         (600, 500, 100, 40, 6, 200, 'horizontal'),
-         (200, 400, 100, 40, 4, 300, 'horizontal'),
-         (100, 250, 80, 40, 5, 150, 'vertical'),
-         (500, 250, 80, 40, 5, 150, 'vertical')
-     ],
-     "coins": [(400, 530), (50, 470), (650, 470), (300, 370), (150, 200), (550, 200)],
-     "enemies": [],
-     "jumping_enemies": [(370, 520, 18, 1200)]},
-    # NIVEAU 10
-    {"platforms": [],
-     "moving_platforms": [
-         (50, 560, 100, 40, 4, 600, 'horizontal'),
-         (50, 460, 100, 40, 5, 600, 'horizontal'),
-         (50, 360, 100, 40, 6, 600, 'horizontal'),
-         (50, 260, 100, 40, 7, 600, 'horizontal'),
-         (50, 160, 100, 40, 8, 600, 'horizontal')
-     ],
-     "coins": [(100, 530), (700, 430), (100, 330), (700, 230), (400, 130)],
-     "enemies": [],
      "jumping_enemies": []}
 ]
 
