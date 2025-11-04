@@ -82,7 +82,7 @@ platform_rects = []; coin_rects = []
 score = 0; current_level_index = 0
 start_time = 0; elapsed_time = 0
 font = pygame.font.Font(None, 74); small_font = pygame.font.Font(None, 36); score_font = pygame.font.Font(None, 40)
-game_state = "playing"
+game_state = "menu"
 
 def load_level(level_index):
     global platform_rects, coin_rects, player_y_velocity, start_time
@@ -96,11 +96,54 @@ def reset_game():
     global game_state, score, current_level_index
     score = 0; current_level_index = 0; load_level(0); game_state = "playing"
 
-reset_game()
+def main_menu():
+    menu_font = pygame.font.Font(None, 100)
+    button_font = pygame.font.Font(None, 50)
+
+    title_rect = menu_font.render("Platformer", True, (0,0,0)).get_rect(center=(screen_width / 2, screen_height / 2 - 100))
+    play_button = pygame.Rect(screen_width / 2 - 100, screen_height / 2, 200, 50)
+    quit_button = pygame.Rect(screen_width / 2 - 100, screen_height / 2 + 70, 200, 50)
+
+    menu_running = True
+    while menu_running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return "quit"
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if play_button.collidepoint(event.pos):
+                    return "playing"
+                if quit_button.collidepoint(event.pos):
+                    return "quit"
+
+        screen.blit(background_image, (0, 0))
+
+        draw_text_with_outline(screen, "Platformer", menu_font, title_rect.topleft, (255, 255, 255), (0, 0, 0))
+
+        pygame.draw.rect(screen, (0, 200, 0), play_button)
+        pygame.draw.rect(screen, (200, 0, 0), quit_button)
+
+        play_text_rect = button_font.render("Jouer", True, (0,0,0)).get_rect(center=play_button.center)
+        draw_text_with_outline(screen, "Jouer", button_font, play_text_rect.topleft, (255, 255, 255), (0, 0, 0))
+
+        quit_text_rect = button_font.render("Quitter", True, (0,0,0)).get_rect(center=quit_button.center)
+        draw_text_with_outline(screen, "Quitter", button_font, quit_text_rect.topleft, (255, 255, 255), (0, 0, 0))
+
+        pygame.display.flip()
+        clock.tick(FPS)
 
 # --- BOUCLE PRINCIPALE ---
 running = True
 while running:
+    if game_state == "menu":
+        game_state = main_menu()
+        if game_state == "quit":
+            running = False
+        elif game_state == "playing":
+            reset_game()
+
+    if not running:
+        break
+
     clock.tick(FPS)
     for event in pygame.event.get():
         if event.type == pygame.QUIT: running = False
@@ -143,8 +186,10 @@ while running:
 
         if not coin_rects:
             current_level_index += 1
-            if current_level_index < len(levels): load_level(current_level_index)
-            else: game_state = "won"
+            if current_level_index < len(levels):
+                load_level(current_level_index)
+            else:
+                game_state = "menu"
 
     # --- DESSIN ---
     screen.blit(background_image, (0, 0))
